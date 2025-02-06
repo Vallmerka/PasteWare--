@@ -68,7 +68,7 @@ end
 local SilentAimSettings = {
     Enabled = false,
     
-    ClassName = "PasteWare  |  aimwhere",
+    ClassName = "PasteWare  |  github.com/FakeAngles",
     ToggleKey = "U",
     
     TeamCheck = false,
@@ -322,7 +322,7 @@ local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/FakeAngles/PasteWare/refs/heads/main/manager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = 'PasteWare  |  aimwhere',
+    Title = 'PasteWare  |  github.com/FakeAngles',
     Center = true,
     AutoShow = true,  
     TabPadding = 8,
