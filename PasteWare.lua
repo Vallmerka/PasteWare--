@@ -2062,11 +2062,14 @@ local strafeEnabled = false
 local strafeAllowed = true
 local strafeSpeed, strafeRadius = 50, 5
 local strafeMode, targetPlayer = "Horizontal", nil
+local originalCameraMode = nil
 
 local function startTargetStrafe()
     if not strafeAllowed then return end
     targetPlayer = getClosestPlayer()
     if targetPlayer and targetPlayer.Parent then
+        originalCameraMode = game:GetService("Players").LocalPlayer.CameraMode
+        game:GetService("Players").LocalPlayer.CameraMode = Enum.CameraMode.Classic
         local targetPos = targetPlayer.Position
         LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos))
         Camera.CameraSubject = targetPlayer.Parent:FindFirstChild("Humanoid")
@@ -2080,15 +2083,16 @@ local function strafeAroundTarget()
     local offset = strafeMode == "Horizontal"
         and Vector3.new(math.cos(angle) * strafeRadius, 0, math.sin(angle) * strafeRadius)
         or Vector3.new(math.cos(angle) * strafeRadius, strafeRadius, math.sin(angle) * strafeRadius)
-
     LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos + offset))
     LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(LocalPlayer.Character.HumanoidRootPart.Position, targetPos)
 end
 
 local function stopTargetStrafe()
+    game:GetService("Players").LocalPlayer.CameraMode = originalCameraMode or Enum.CameraMode.Classic
     Camera.CameraSubject = LocalPlayer.Character.Humanoid
     strafeEnabled, targetPlayer = false, nil
 end
+
 
 targetStrafe:AddToggle("strafeControlToggle", {
     Text = "Enable/Disable",
