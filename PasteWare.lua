@@ -1673,40 +1673,10 @@ end
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
 local isRPGSpamEnabled = false
 local spamSpeed = 1
 local rocketsToFire = 1
-
 local RocketSystem, FireRocket, FireRocketClient, ACS_Client
-
-local function getClosestPlayer()
-    if not Options.TargetPart.Value then return end
-    local Closest
-    local DistanceToMouse
-    for _, Player in next, GetPlayers(Players) do
-        if Player == LocalPlayer then continue end
-        if Toggles.TeamCheck.Value and Player.Team == LocalPlayer.Team then continue end
-
-        local Character = Player.Character
-        if not Character then continue end
-
-        local HumanoidRootPart = FindFirstChild(Character, "HumanoidRootPart")
-        local Humanoid = FindFirstChild(Character, "Humanoid")
-        if not HumanoidRootPart or not Humanoid or Humanoid and Humanoid.Health <= 0 then continue end
-
-        local ScreenPosition, OnScreen = getPositionOnScreen(HumanoidRootPart.Position)
-        if not OnScreen then continue end
-
-        local Distance = (getMousePosition() - ScreenPosition).Magnitude
-        if Distance <= (DistanceToMouse or Options.Radius.Value or 2000) then
-            Closest = ((Options.TargetPart.Value == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]]) or Character[Options.TargetPart.Value])
-            DistanceToMouse = Distance
-        end
-    end
-    return Closest
-end
-
 local function startRPGSpam()
     if not masterToggle then return end
     if not isRPGSpamEnabled then return end
@@ -2088,62 +2058,24 @@ ACSEngineBox:AddButton('CHANGE FIRE MODE', function()
 end)
 
 local targetStrafe = GeneralTab:AddLeftGroupbox("Target Strafe")
-
 local strafeEnabled = false
 local strafeAllowed = true
 local strafeSpeed, strafeRadius = 50, 5
 local strafeMode, targetPlayer = "Horizontal", nil
-local originalCameraMode = nil
-
-local function updateFovCircle(targetPosition)
-    if Toggles.Visible.Value then
-        local fov_circle = getFovCircle()
-        fov_circle.Position = Vector2.new(targetPosition.X, targetPosition.Y)
-        fov_circle.Radius = Options.Radius.Value
-    end
-end
-
-local function getClosestPlayer()
-    local nearest, shortest = nil, math.huge
-    local mousePos = Camera:ViewportPointToRay(Mouse.X, Mouse.Y).Origin
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local part = player.Character.Head
-            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                if dist < shortest then
-                    nearest, shortest = player, dist
-                end
-            end
-        end
-    end
-    return nearest
-end
 
 local function startTargetStrafe()
     if not strafeAllowed then return end
     targetPlayer = getClosestPlayer()
-    if targetPlayer and targetPlayer.Character then
-        originalCameraMode = game:GetService("Players").LocalPlayer.CameraMode
-        game:GetService("Players").LocalPlayer.CameraMode = Enum.CameraMode.Classic
-
-        LocalPlayer.Character:SetPrimaryPartCFrame(targetPlayer.Character.HumanoidRootPart.CFrame)
-        Camera.CameraSubject = targetPlayer.Character.Humanoid
-        updateFovCircle(targetPlayer.Character.HumanoidRootPart.Position)
-
-        targetPlayer.Character.Humanoid.Died:Connect(stopTargetStrafe)
-        targetPlayer.AncestryChanged:Connect(function(_, parent)
-            if not parent then stopTargetStrafe() end
-        end)
+    if targetPlayer and targetPlayer.Parent then
+        local targetPos = targetPlayer.Position
+        LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos))
+        Camera.CameraSubject = targetPlayer.Parent:FindFirstChild("Humanoid")
     end
 end
 
 local function strafeAroundTarget()
-    if not (strafeAllowed and targetPlayer and targetPlayer.Character) then return end
-
-    local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+    if not (strafeAllowed and targetPlayer and targetPlayer.Parent) then return end
+    local targetPos = targetPlayer.Position
     local angle = tick() * (strafeSpeed / 10)
     local offset = strafeMode == "Horizontal"
         and Vector3.new(math.cos(angle) * strafeRadius, 0, math.sin(angle) * strafeRadius)
@@ -2151,12 +2083,10 @@ local function strafeAroundTarget()
 
     LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos + offset))
     LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(LocalPlayer.Character.HumanoidRootPart.Position, targetPos)
-    updateFovCircle(targetPos)
 end
 
 local function stopTargetStrafe()
     Camera.CameraSubject = LocalPlayer.Character.Humanoid
-    game:GetService("Players").LocalPlayer.CameraMode = originalCameraMode or Enum.CameraMode.Classic
     strafeEnabled, targetPlayer = false, nil
 end
 
