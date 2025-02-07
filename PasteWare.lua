@@ -116,14 +116,6 @@ local create = coroutine.create
 local ValidTargetParts = {"Head", "HumanoidRootPart"}
 local PredictionAmount = 0.165
 
-local mouse_box = Drawing.new("Square")
-mouse_box.Visible = true 
-mouse_box.ZIndex = 999 
-mouse_box.Color = Color3.fromRGB(54, 57, 241)
-mouse_box.Thickness = 20 
-mouse_box.Size = Vector2.new(20, 20)
-mouse_box.Filled = true 
-
 local fov_circle = Drawing.new("Circle")
 fov_circle.Thickness = 1
 fov_circle.NumSides = 100
@@ -595,7 +587,6 @@ Options.aim_Enabled_KeyPicker:OnClick(function()
     SilentAimSettings.Enabled = not SilentAimSettings.Enabled
     Toggles.aim_Enabled.Value = SilentAimSettings.Enabled
     Toggles.aim_Enabled:SetValue(SilentAimSettings.Enabled)
-    mouse_box.Visible = SilentAimSettings.Enabled
 end)
 
 Main:AddToggle("TeamCheck", {
@@ -712,7 +703,6 @@ end)
 
 local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
     local Main = FieldOfViewBOX:AddTab("Visuals")
-    
 
     Main:AddToggle("Visible", {Text = "Show FOV Circle"})
         :AddColorPicker("Color", {Default = Color3.fromRGB(54, 57, 241)})
@@ -720,7 +710,6 @@ local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
             fov_circle.Visible = Toggles.Visible.Value
             SilentAimSettings.FOVVisible = Toggles.Visible.Value
         end)
-
 
     Main:AddSlider("Radius", {
         Text = "FOV Circle Radius", 
@@ -733,27 +722,49 @@ local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
         SilentAimSettings.FOVRadius = Options.Radius.Value
     end)
 
-
     Main:AddToggle("MousePosition", {Text = "Show Silent Aim Target"})
         :AddColorPicker("MouseVisualizeColor", {Default = Color3.fromRGB(54, 57, 241)})
         :OnChanged(function()
-            mouse_box.Visible = Toggles.MousePosition.Value 
-            SilentAimSettings.ShowSilentAimTarget = Toggles.MousePosition.Value 
+            SilentAimSettings.ShowSilentAimTarget = Toggles.MousePosition.Value
         end)
+end
+
+local previousHighlight = nil
+local function removeOldHighlight()
+    if previousHighlight then
+        previousHighlight:Destroy()
+        previousHighlight = nil
+    end
 end
 
 resume(create(function()
     RenderStepped:Connect(function()
-        if Toggles.MousePosition.Value and Toggles.aim_Enabled.Value then
-            if getClosestPlayer() then 
-                local Root = getClosestPlayer().Parent.PrimaryPart or getClosestPlayer()
-                local RootToViewportPoint, IsOnScreen = WorldToViewportPoint(Camera, Root.Position);
+        if Toggles.aim_Enabled.Value then
+            local closestPlayer = getClosestPlayer()
+            
+            if closestPlayer then 
+                local Root = closestPlayer.Parent.PrimaryPart or closestPlayer
+                local RootToViewportPoint, IsOnScreen = WorldToViewportPoint(Camera, Root.Position)
 
-                mouse_box.Visible = IsOnScreen
-                mouse_box.Position = Vector2.new(RootToViewportPoint.X, RootToViewportPoint.Y)
+                removeOldHighlight()
+
+                if IsOnScreen then
+                    local highlight = closestPlayer.Parent:FindFirstChildOfClass("Highlight")
+                    if not highlight then
+                        highlight = Instance.new("Highlight")
+                        highlight.Parent = closestPlayer.Parent
+                        highlight.Adornee = closestPlayer.Parent
+                    end
+
+                    highlight.FillColor = Options.MouseVisualizeColor.Value
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineColor = Options.MouseVisualizeColor.Value
+                    highlight.OutlineTransparency = 0
+
+                    previousHighlight = highlight
+                end
             else 
-                mouse_box.Visible = false 
-                mouse_box.Position = Vector2.new()
+                removeOldHighlight()
             end
         end
         
@@ -764,6 +775,7 @@ resume(create(function()
         end
     end)
 end))
+
 
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(...)
