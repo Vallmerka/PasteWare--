@@ -708,7 +708,6 @@ end)
 
 local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
     local Main = FieldOfViewBOX:AddTab("Visuals")
-    
 
     Main:AddToggle("Visible", {Text = "Show FOV Circle"})
         :AddColorPicker("Color", {Default = Color3.fromRGB(54, 57, 241)})
@@ -716,7 +715,6 @@ local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
             fov_circle.Visible = Toggles.Visible.Value
             SilentAimSettings.FOVVisible = Toggles.Visible.Value
         end)
-
 
     Main:AddSlider("Radius", {
         Text = "FOV Circle Radius", 
@@ -729,27 +727,49 @@ local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
         SilentAimSettings.FOVRadius = Options.Radius.Value
     end)
 
-
     Main:AddToggle("MousePosition", {Text = "Show Silent Aim Target"})
         :AddColorPicker("MouseVisualizeColor", {Default = Color3.fromRGB(54, 57, 241)})
         :OnChanged(function()
-            mouse_box.Visible = Toggles.MousePosition.Value 
-            SilentAimSettings.ShowSilentAimTarget = Toggles.MousePosition.Value 
+            SilentAimSettings.ShowSilentAimTarget = Toggles.MousePosition.Value
         end)
 end
 
+local previousHighlight = nil
+local function removeOldHighlight()
+    if previousHighlight then
+        previousHighlight:Destroy()
+        previousHighlight = nil
+    end
+end
+
 resume(create(function()
-    local Camera = workspace.CurrentCamera
     RenderStepped:Connect(function()
-        if Toggles.MousePosition.Value and Toggles.aim_Enabled.Value then
-            if getClosestPlayer() then 
-                local Root = getClosestPlayer().Parent.PrimaryPart or getClosestPlayer()
+        if Toggles.aim_Enabled.Value then
+            local closestPlayer = getClosestPlayer()
+            
+            if closestPlayer then 
+                local Root = closestPlayer.Parent.PrimaryPart or closestPlayer
                 local RootToViewportPoint, IsOnScreen = WorldToViewportPoint(Camera, Root.Position)
-                mouse_box.Visible = IsOnScreen
-                mouse_box.Position = Vector2.new(RootToViewportPoint.X, RootToViewportPoint.Y)
+
+                removeOldHighlight()
+
+                if IsOnScreen then
+                    local highlight = closestPlayer.Parent:FindFirstChildOfClass("Highlight")
+                    if not highlight then
+                        highlight = Instance.new("Highlight")
+                        highlight.Parent = closestPlayer.Parent
+                        highlight.Adornee = closestPlayer.Parent
+                    end
+
+                    highlight.FillColor = Options.MouseVisualizeColor.Value
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineColor = Options.MouseVisualizeColor.Value
+                    highlight.OutlineTransparency = 0
+
+                    previousHighlight = highlight
+                end
             else 
-                mouse_box.Visible = false 
-                mouse_box.Position = Vector2.new()
+                removeOldHighlight()
             end
         end
         
@@ -1669,42 +1689,10 @@ end
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
 local isRPGSpamEnabled = false
 local spamSpeed = 1
 local rocketsToFire = 1
-
 local RocketSystem, FireRocket, FireRocketClient, ACS_Client
-
-local function getClosestPlayer()
-    if not Options.TargetPart.Value then return end
-    local Camera = workspace.CurrentCamera
-    local Closest
-    local DistanceToMouse
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    
-    for _, Player in next, GetPlayers(Players) do
-        if Player == LocalPlayer then continue end
-        if Toggles.TeamCheck.Value and Player.Team == LocalPlayer.Team then continue end
-
-        local Character = Player.Character
-        if not Character then continue end
-
-        local HumanoidRootPart = FindFirstChild(Character, "HumanoidRootPart")
-        local Humanoid = FindFirstChild(Character, "Humanoid")
-        if not HumanoidRootPart or not Humanoid or Humanoid and Humanoid.Health <= 0 then continue end
-
-        local ScreenPosition, OnScreen = getPositionOnScreen(HumanoidRootPart.Position)
-        if not OnScreen then continue end
-
-        local Distance = (center - ScreenPosition).Magnitude
-        if Distance <= (DistanceToMouse or Options.Radius.Value or 2000) then
-            Closest = ((Options.TargetPart.Value == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]]) or Character[Options.TargetPart.Value])
-            DistanceToMouse = Distance
-        end
-    end
-    return Closest
-end
 
 local function startRPGSpam()
     if not masterToggle then return end
@@ -2029,77 +2017,41 @@ ACSEngineBox:AddButton('CHANGE FIRE MODE', function()
 end)
 
 local targetStrafe = GeneralTab:AddLeftGroupbox("Target Strafe")
-
 local strafeEnabled = false
 local strafeAllowed = true
 local strafeSpeed, strafeRadius = 50, 5
 local strafeMode, targetPlayer = "Horizontal", nil
 local originalCameraMode = nil
 
-local function updateFovCircle(targetPosition)
-    if Toggles.Visible.Value then
-        local fov_circle = getFovCircle()
-        fov_circle.Position = Vector2.new(targetPosition.X, targetPosition.Y)
-        fov_circle.Radius = Options.Radius.Value
-    end
-end
-
-local function getClosestPlayer()
-    local nearest, shortest = nil, math.huge
-    local mousePos = Camera:ViewportPointToRay(Mouse.X, Mouse.Y).Origin
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local part = player.Character.Head
-            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                if dist < shortest then
-                    nearest, shortest = player, dist
-                end
-            end
-        end
-    end
-    return nearest
-end
-
 local function startTargetStrafe()
     if not strafeAllowed then return end
     targetPlayer = getClosestPlayer()
-    if targetPlayer and targetPlayer.Character then
+    if targetPlayer and targetPlayer.Parent then
         originalCameraMode = game:GetService("Players").LocalPlayer.CameraMode
         game:GetService("Players").LocalPlayer.CameraMode = Enum.CameraMode.Classic
-
-        LocalPlayer.Character:SetPrimaryPartCFrame(targetPlayer.Character.HumanoidRootPart.CFrame)
-        Camera.CameraSubject = targetPlayer.Character.Humanoid
-        updateFovCircle(targetPlayer.Character.HumanoidRootPart.Position)
-
-        targetPlayer.Character.Humanoid.Died:Connect(stopTargetStrafe)
-        targetPlayer.AncestryChanged:Connect(function(_, parent)
-            if not parent then stopTargetStrafe() end
-        end)
+        local targetPos = targetPlayer.Position
+        LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos))
+        Camera.CameraSubject = targetPlayer.Parent:FindFirstChild("Humanoid")
     end
 end
 
 local function strafeAroundTarget()
-    if not (strafeAllowed and targetPlayer and targetPlayer.Character) then return end
-
-    local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+    if not (strafeAllowed and targetPlayer and targetPlayer.Parent) then return end
+    local targetPos = targetPlayer.Position
     local angle = tick() * (strafeSpeed / 10)
     local offset = strafeMode == "Horizontal"
         and Vector3.new(math.cos(angle) * strafeRadius, 0, math.sin(angle) * strafeRadius)
         or Vector3.new(math.cos(angle) * strafeRadius, strafeRadius, math.sin(angle) * strafeRadius)
-
     LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos + offset))
     LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(LocalPlayer.Character.HumanoidRootPart.Position, targetPos)
-    updateFovCircle(targetPos)
 end
 
 local function stopTargetStrafe()
-    Camera.CameraSubject = LocalPlayer.Character.Humanoid
     game:GetService("Players").LocalPlayer.CameraMode = originalCameraMode or Enum.CameraMode.Classic
+    Camera.CameraSubject = LocalPlayer.Character.Humanoid
     strafeEnabled, targetPlayer = false, nil
 end
+
 
 targetStrafe:AddToggle("strafeControlToggle", {
     Text = "Enable/Disable",
