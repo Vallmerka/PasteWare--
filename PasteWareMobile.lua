@@ -206,6 +206,7 @@ local function getClosestPlayer()
     local Camera = workspace.CurrentCamera
     local Closest
     local DistanceToMouse
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     local ignoredPlayers = Options.PlayerDropdown.Value 
 
     for _, Player in next, GetPlayers(Players) do
@@ -219,7 +220,7 @@ local function getClosestPlayer()
         if not HumanoidRootPart or not Humanoid or Humanoid and Humanoid.Health <= 0 then continue end
         local ScreenPosition, OnScreen = getPositionOnScreen(HumanoidRootPart.Position)
         if not OnScreen then continue end
-        local Distance = (getMousePosition() - ScreenPosition).Magnitude
+        local Distance = (center - ScreenPosition).Magnitude
         if Distance <= (DistanceToMouse or Options.Radius.Value or 2000) then
             Closest = ((Options.TargetPart.Value == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]]) or Character[Options.TargetPart.Value])
             DistanceToMouse = Distance
