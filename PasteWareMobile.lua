@@ -206,25 +206,22 @@ local function getClosestPlayer()
     local Camera = workspace.CurrentCamera
     local Closest
     local DistanceToMouse
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    
+    local ignoredPlayers = Options.PlayerDropdown.Value 
+
     for _, Player in next, GetPlayers(Players) do
         if Player == LocalPlayer then continue end
+        if ignoredPlayers and ignoredPlayers[Player.Name] then continue end
         if Toggles.TeamCheck.Value and Player.Team == LocalPlayer.Team then continue end
-        
         local Character = Player.Character
         if not Character then continue end
-        
         local HumanoidRootPart = FindFirstChild(Character, "HumanoidRootPart")
         local Humanoid = FindFirstChild(Character, "Humanoid")
-        if not HumanoidRootPart or not Humanoid or Humanoid.Health <= 0 then continue end
-        
+        if not HumanoidRootPart or not Humanoid or Humanoid and Humanoid.Health <= 0 then continue end
         local ScreenPosition, OnScreen = getPositionOnScreen(HumanoidRootPart.Position)
         if not OnScreen then continue end
-        
-        local Distance = (center - ScreenPosition).Magnitude
+        local Distance = (getMousePosition() - ScreenPosition).Magnitude
         if Distance <= (DistanceToMouse or Options.Radius.Value or 2000) then
-            Closest = Options.TargetPart.Value == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]] or Character[Options.TargetPart.Value]
+            Closest = ((Options.TargetPart.Value == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]]) or Character[Options.TargetPart.Value])
             DistanceToMouse = Distance
         end
     end
@@ -724,6 +721,13 @@ local FieldOfViewBOX = GeneralTab:AddLeftTabbox("Field Of View") do
         :OnChanged(function()
             SilentAimSettings.ShowSilentAimTarget = Toggles.MousePosition.Value
         end)
+
+    Main:AddDropdown("PlayerDropdown", {
+        SpecialType = "Player",
+        Text = "Ignore Player",
+        Tooltip = "Friend list",
+        Multi = true
+    })
 end
 
 local previousHighlight = nil
@@ -1156,7 +1160,6 @@ local camera = game.Workspace.CurrentCamera
 local lockedTime, fovValue, nebulaEnabled = 12, 70, false
 local originalAmbient, originalOutdoorAmbient = lighting.Ambient, lighting.OutdoorAmbient
 local originalFogStart, originalFogEnd, originalFogColor = lighting.FogStart, lighting.FogEnd, lighting.FogColor
-
 local nebulaThemeColor = Color3.fromRGB(173, 216, 230)
 
 worldbox:AddSlider("world_time", {
@@ -1177,7 +1180,18 @@ worldbox:AddSlider("fov_slider", {
     Callback = function(v) fovValue = v end,
 })
 
-game:GetService("RunService").RenderStepped:Connect(function() camera.FieldOfView = fovValue end)
+local fovEnabled = false
+
+worldbox:AddToggle("fov_toggle", {
+    Text = "Enable FOV Change", Default = false,
+    Callback = function(state) fovEnabled = state end,
+})
+
+game:GetService("RunService").RenderStepped:Connect(function() 
+    if fovEnabled then
+        camera.FieldOfView = fovValue 
+    end
+end)
 
 worldbox:AddToggle("nebula_theme", {
     Text = "Nebula Theme", Default = false,
@@ -1684,12 +1698,12 @@ local LocalPlayer = Players.LocalPlayer
 local isRPGSpamEnabled = false
 local spamSpeed = 1
 local rocketsToFire = 1
-local RocketSystem, FireRocket, FireRocketClient, ACS_Client
+local selectedMode = "Rocket"
+local RocketSystem, FireRocket, FireRocketClient
+local rocketNumber = 1
 
 local function startRPGSpam()
-    if not masterToggle then return end
     if not isRPGSpamEnabled then return end
-
     if not RocketSystem then
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
         RocketSystem = ReplicatedStorage:WaitForChild("RocketSystem")
@@ -1710,43 +1724,54 @@ local function startRPGSpam()
 
     local activeWeapon = getActiveWeapon()
     if not activeWeapon then return end
-
     for i = 1, rocketsToFire do
         if not isRPGSpamEnabled then return end
-
-        local closestPlayer = getClosestPlayer()
-        if not closestPlayer then return end
-
-        local targetPosition = closestPlayer.Position
+        local targetHead = getClosestPlayer()
+        if not targetHead then return end
+        local targetPosition = targetHead.Position
         local directionToTarget = (targetPosition - LocalPlayer.Character.HumanoidRootPart.Position).unit
-
-        FireRocket:InvokeServer(directionToTarget, workspace[LocalPlayer.Name][activeWeapon], workspace[LocalPlayer.Name][activeWeapon], targetPosition)
-        FireRocketClient:Fire(
-            targetPosition,
-            directionToTarget,
-            {
-                ["expShake"] = {["fadeInTime"] = 0.05, ["magnitude"] = 3, ["rotInfluence"] = {0.4, 0, 0.4}, ["fadeOutTime"] = 0.5, ["posInfluence"] = {1, 1, 0}, ["roughness"] = 3},
-                ["gravity"] = Vector3.new(0, -20, 0),
-                ["HelicopterDamage"] = 450,
-                ["FireRate"] = 15,
-                ["VehicleDamage"] = 350,
-                ["ExpName"] = RPG,
-                ["ExpRadius"] = 12,
-                ["BoatDamage"] = 300,
-                ["TankDamage"] = 300,
-                ["Acceleration"] = 8,
-                ["ShieldDamage"] = 170,
-                ["Distance"] = 4000,
-                ["PlaneDamage"] = 500,
-                ["GunshipDamage"] = 170,
-                ["velocity"] = 200,
-                ["ExplosionDamage"] = 120
-            },
-            RocketSystem.Rockets["RPG Rocket"],
-            workspace[LocalPlayer.Name][activeWeapon],
-            workspace[LocalPlayer.Name][activeWeapon],
-            LocalPlayer
-        )
+        if selectedMode == "Rocket" then
+            FireRocket:InvokeServer(directionToTarget, workspace[LocalPlayer.Name][activeWeapon], workspace[LocalPlayer.Name][activeWeapon], targetPosition)
+            FireRocketClient:Fire(
+                targetPosition,
+                directionToTarget,
+                {
+                    ["expShake"] = {["fadeInTime"] = 0.05, ["magnitude"] = 3, ["rotInfluence"] = {0.4, 0, 0.4}, ["fadeOutTime"] = 0.5, ["posInfluence"] = {1, 1, 0}, ["roughness"] = 3},
+                    ["gravity"] = Vector3.new(0, -20, 0),
+                    ["HelicopterDamage"] = 450,
+                    ["FireRate"] = 15,
+                    ["VehicleDamage"] = 350,
+                    ["ExpName"] = RPG,
+                    ["ExpRadius"] = 12,
+                    ["BoatDamage"] = 300,
+                    ["TankDamage"] = 300,
+                    ["Acceleration"] = 8,
+                    ["ShieldDamage"] = 170,
+                    ["Distance"] = 4000,
+                    ["PlaneDamage"] = 500,
+                    ["GunshipDamage"] = 170,
+                    ["velocity"] = 200,
+                    ["ExplosionDamage"] = 120
+                },
+                RocketSystem.Rockets["RPG Rocket"],
+                workspace[LocalPlayer.Name][activeWeapon],
+                workspace[LocalPlayer.Name][activeWeapon],
+                LocalPlayer
+            )
+        elseif selectedMode == "Explode" then
+            FireRocket:InvokeServer(directionToTarget, workspace[LocalPlayer.Name][activeWeapon], workspace[LocalPlayer.Name][activeWeapon], targetPosition)
+            local RS = game:GetService("ReplicatedStorage").RocketSystem.Events
+            RS.RocketHit:FireServer(
+                targetPosition, 
+                directionToTarget, 
+                workspace[LocalPlayer.Name][activeWeapon],  
+                workspace[LocalPlayer.Name][activeWeapon], 
+                targetHead, 
+                targetHead, 
+                LocalPlayer.Name .. "Rocket" .. rocketNumber 
+            )
+            rocketNumber = rocketNumber + 1 
+        end
     end
 end
 
@@ -1794,16 +1819,20 @@ WarTycoonBox:AddSlider("Spam Speed", {
     end,
 })
 
-game:GetService("RunService").Heartbeat:Connect(function()
-    if isRPGSpamEnabled then
-        wait(1 / spamSpeed)
-        startRPGSpam()
-    end
-end)
+WarTycoonBox:AddDropdown("RPG Mode", {
+    Text = "Select Rocket Mode",
+    Values = {"Rocket", "Explode"},
+    Default = "Rocket",
+    Tooltip = "Choose between Rocket spam or Explode mode.",
+    Multi = false,
+    Callback = function(value)
+        selectedMode = value
+    end,
+})
 
 game:GetService("RunService").Heartbeat:Connect(function()
     if isRPGSpamEnabled then
-        wait(1 / spamSpeed)
+        wait(math.max(0.01, 1 / spamSpeed))
         startRPGSpam()
     end
 end)
