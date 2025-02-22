@@ -741,7 +741,7 @@ end
 
 resume(create(function()
     RenderStepped:Connect(function()
-        if Toggles.aim_Enabled.Value then
+        if Toggles.MousePosition.Value then
             local closestPlayer = getClosestPlayer()
             
             if closestPlayer then 
