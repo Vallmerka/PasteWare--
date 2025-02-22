@@ -746,15 +746,12 @@ end
 
 resume(create(function()
     RenderStepped:Connect(function()
-        if Toggles.aim_Enabled.Value then
+        if Toggles.MousePosition.Value then
             local closestPlayer = getClosestPlayer()
-            
             if closestPlayer then 
                 local Root = closestPlayer.Parent.PrimaryPart or closestPlayer
                 local RootToViewportPoint, IsOnScreen = WorldToViewportPoint(Camera, Root.Position)
-
                 removeOldHighlight()
-
                 if IsOnScreen then
                     local highlight = closestPlayer.Parent:FindFirstChildOfClass("Highlight")
                     if not highlight then
@@ -762,12 +759,10 @@ resume(create(function()
                         highlight.Parent = closestPlayer.Parent
                         highlight.Adornee = closestPlayer.Parent
                     end
-
                     highlight.FillColor = Options.MouseVisualizeColor.Value
                     highlight.FillTransparency = 0.5
                     highlight.OutlineColor = Options.MouseVisualizeColor.Value
                     highlight.OutlineTransparency = 0
-
                     previousHighlight = highlight
                 end
             else 
