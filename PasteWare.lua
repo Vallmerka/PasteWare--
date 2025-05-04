@@ -1704,7 +1704,7 @@ local spamSpeed = 1
 local rocketsToFire = 1
 local selectedMode = "Rocket"
 local RocketSystem, FireRocket, FireRocketClient
-local rocketNumber = 1
+local rocketNumber = 2
 
 local function startRPGSpam()
     if not isRPGSpamEnabled then return end
@@ -1802,9 +1802,9 @@ WarTycoonBox:AddToggle("RPG Spam", {
 
 WarTycoonBox:AddSlider("Rocket Count", {
     Text = "Rockets per Spam",
-    Default = 1,
+    Default = math.huge,
     Min = 1,
-    Max = 500000,
+    Max = math.huge,
     Rounding = 0,
     Tooltip = "Adjust how many rockets to fire at once.",
     Callback = function(value)
@@ -1814,8 +1814,8 @@ WarTycoonBox:AddSlider("Rocket Count", {
 
 WarTycoonBox:AddSlider("Spam Speed", {
     Text = "Rockets Spam Speed",
-    Default = 1,
-    Min = 0.1,
+    Default = -math.huge,
+    Min = -math.huge,
     Max = 5,
     Rounding = 1,
     Tooltip = "Adjust the speed of RPG spam.",
